@@ -2,7 +2,6 @@ package models
 
 import (
 	"pbkk-fp-go/entities"
-
 	"gorm.io/gorm"
 )
 
@@ -14,7 +13,6 @@ func NewMenuModel(db *gorm.DB) *MenuModel {
 	return &MenuModel{DB: db}
 }
 
-// fungsi untuk mendapatkan semua menu
 func (m *MenuModel) GetAllMenus() ([]entities.Menu, error) {
 	var menus []entities.Menu
 	if err := m.DB.Find(&menus).Error; err != nil {
@@ -23,7 +21,22 @@ func (m *MenuModel) GetAllMenus() ([]entities.Menu, error) {
 	return menus, nil
 }
 
-// fungsi untuk menambahkan menu baru
 func (m *MenuModel) Create(menu *entities.Menu) error {
 	return m.DB.Create(menu).Error
+}
+
+// UpdateMenu mengupdate menu berdasarkan ID
+func (m *MenuModel) UpdateMenu(id string, menu *entities.Menu) error {
+	if err := m.DB.Model(&entities.Menu{}).Where("id = ?", id).Updates(menu).Error; err != nil {
+		return err
+	}
+	return nil
+}
+
+// DeleteMenu menghapus menu berdasarkan ID
+func (m *MenuModel) DeleteMenu(id string) error {
+	if err := m.DB.Where("id = ?", id).Delete(&entities.Menu{}).Error; err != nil {
+		return err
+	}
+	return nil
 }
