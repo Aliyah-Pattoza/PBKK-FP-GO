@@ -43,3 +43,14 @@ func (c *UserController) GetUserByEmail(ctx *gin.Context) {
 
 	ctx.JSON(http.StatusOK, user)
 }
+
+// Handler untuk rute profil pengguna
+func Profile(c *gin.Context) {
+	// Ambil klaim dari context (disimpan oleh middleware JWT)
+	claims, _ := c.Get("claims")
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "This is a protected route",
+		"claims":  claims,
+	})
+}
