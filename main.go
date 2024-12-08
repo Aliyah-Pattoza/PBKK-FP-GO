@@ -1,20 +1,32 @@
 package main
 
 import (
+	"log"
 	"net/http"
 	"pbkk-fp-go/config"
 	"pbkk-fp-go/controllers/homepage"
+	"pbkk-fp-go/routes"
+
+	"github.com/gin-gonic/gin"
 )
 
 func main() {
 	// Inisialisasi koneksi database
-	config.ConnectDatabase()
+	// config.ConnectDatabase()
+	db := config.ConnectDatabase()
+	if db == nil {
+		log.Fatal("Database connection failed")
+	}
 
 	// Inisialisasi router
-	//r := gin.Default()
+	r := gin.Default()
 
 	// Homepage
 	http.HandleFunc("/", homepage.Welcome)
+
+	// Register routes
+	routes.RegisterOrderItemRoutes(r, db)
+	routes.RegisterUserRoutes(r)
 
 	//Menu
 
@@ -39,8 +51,8 @@ func main() {
 				c.JSON(200, gin.H{"message": "Welcome, user!"})
 			})
 		}
-
-		// Jalankan server pada port 8080
-		//r.Run(":8080")*/
+	*/
+	// Jalankan server pada port 8080
+	r.Run(":8080")
 	http.ListenAndServe(":8080", nil)
 }

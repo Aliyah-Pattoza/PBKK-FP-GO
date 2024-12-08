@@ -29,4 +29,5 @@ func ConnectDatabase() {
 	}
 
 	DB = db
+	return db
 }
