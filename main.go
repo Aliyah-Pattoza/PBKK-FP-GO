@@ -1,7 +1,6 @@
 package main
 
 import (
-	"log"
 	"net/http"
 	"pbkk-fp-go/config"
 	"pbkk-fp-go/controllers/homepage"
@@ -12,11 +11,11 @@ import (
 
 func main() {
 	// Inisialisasi koneksi database
-	// config.ConnectDatabase()
-	db := config.ConnectDatabase()
-	if db == nil {
-		log.Fatal("Database connection failed")
-	}
+	config.ConnectDatabase()
+	DB := config.DB
+	// if DB == nil {
+	// 	log.Fatal("Database connection failed")
+	// }
 
 	// Inisialisasi router
 	r := gin.Default()
@@ -25,7 +24,7 @@ func main() {
 	http.HandleFunc("/", homepage.Welcome)
 
 	// Register routes
-	routes.RegisterOrderItemRoutes(r, db)
+	routes.RegisterOrderItemRoutes(r, DB)
 	routes.RegisterUserRoutes(r)
 
 	//Menu
