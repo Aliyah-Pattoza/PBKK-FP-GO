@@ -66,3 +66,22 @@ func (m *ReservationModel) Cancel(reservationID uint) error {
 	}
 	return nil
 }
+
+// UpdateStatus updates the status of a reservation
+func (m *ReservationModel) UpdateStatus(reservationID uint, status string) error {
+	// Cari reservasi berdasarkan ID
+	var reservation entities.Reservation
+	if err := m.DB.First(&reservation, reservationID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return errors.New("reservation not found")
+		}
+		return errors.New("failed to find reservation: " + err.Error())
+	}
+
+	// Perbarui status reservasi
+	reservation.Status = status
+	if err := m.DB.Save(&reservation).Error; err != nil {
+		return errors.New("failed to update reservation status: " + err.Error())
+	}
+	return nil
+}

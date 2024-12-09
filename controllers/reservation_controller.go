@@ -26,7 +26,11 @@ func (c *ReservationController) CreateReservation(ctx *gin.Context) {
 		return
 	}
 
-	// Validate date and time
+	// Set userID dari JWT
+	userID := ctx.MustGet("userID").(uint)
+	reservation.UserID = userID
+
+	// Validasi tanggal dan jumlah orang
 	if reservation.ReservationDate.Before(time.Now()) {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Reservation date cannot be in the past"})
 		return
@@ -36,7 +40,7 @@ func (c *ReservationController) CreateReservation(ctx *gin.Context) {
 		return
 	}
 
-	// Save reservation
+	// Simpan reservasi
 	if err := c.ReservationModel.Create(&reservation); err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create reservation: " + err.Error()})
 		return
@@ -48,43 +52,22 @@ func (c *ReservationController) CreateReservation(ctx *gin.Context) {
 	})
 }
 
-// GetReservationsByUserID handles fetching reservations by user ID
-func (c *ReservationController) GetReservationsByUserID(ctx *gin.Context) {
-	userID := ctx.Param("userID")
+// GetReservations handles fetching reservations based on user role
+func (c *ReservationController) GetReservations(ctx *gin.Context) {
+	userID := ctx.MustGet("userID").(uint)
+	role := ctx.MustGet("role").(string)
 
-	// Convert userID from string to uint
-	uintUserID, err := strconv.ParseUint(userID, 10, 32)
-	if err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID"})
-		return
+	var reservations []entities.Reservation
+	var err error
+
+	if role == "admin" {
+		// Admin dapat melihat semua reservasi
+		reservations, err = c.ReservationModel.GetAll()
+	} else {
+		// User hanya dapat melihat reservasi miliknya sendiri
+		reservations, err = c.ReservationModel.GetByUserID(userID)
 	}
 
-	// Fetch reservations
-	reservations, err := c.ReservationModel.GetByUserID(uint(uintUserID))
-	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch reservations: " + err.Error()})
-		return
-	}
-
-	if len(reservations) == 0 {
-		ctx.JSON(http.StatusNotFound, gin.H{"message": "No reservations found for this user"})
-		return
-	}
-
-	ctx.JSON(http.StatusOK, reservations)
-}
-
-// GetAllReservations handles fetching all reservations (admin-only)
-func (c *ReservationController) GetAllReservations(ctx *gin.Context) {
-	// Check admin role
-	isAdmin := ctx.MustGet("role").(string) == "admin"
-	if !isAdmin {
-		ctx.JSON(http.StatusForbidden, gin.H{"error": "You are not authorized to view all reservations"})
-		return
-	}
-
-	// Fetch all reservations
-	reservations, err := c.ReservationModel.GetAll()
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch reservations: " + err.Error()})
 		return
@@ -93,9 +76,9 @@ func (c *ReservationController) GetAllReservations(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, reservations)
 }
 
-// CancelReservation handles canceling a reservation
+// CancelReservation handles cancelling a reservation
 func (c *ReservationController) CancelReservation(ctx *gin.Context) {
-	// Retrieve reservation ID
+	// Ambil ID reservasi
 	reservationID := ctx.Param("id")
 	uintReservationID, err := strconv.ParseUint(reservationID, 10, 32)
 	if err != nil {
@@ -103,28 +86,67 @@ func (c *ReservationController) CancelReservation(ctx *gin.Context) {
 		return
 	}
 
-	// Retrieve userID and role from context
+	// Ambil userID dan role dari JWT
 	userID := ctx.MustGet("userID").(uint)
-	isAdmin := ctx.MustGet("role").(string) == "admin"
+	role := ctx.MustGet("role").(string)
 
-	// Retrieve the reservation by ID
+	// Ambil reservasi berdasarkan ID
 	reservation, err := c.ReservationModel.GetByID(uint(uintReservationID))
 	if err != nil {
 		ctx.JSON(http.StatusNotFound, gin.H{"error": "Reservation not found"})
 		return
 	}
 
-	// Check if user is admin or the owner of the reservation
-	if !isAdmin && reservation.ID != userID {
+	// Periksa apakah user adalah admin atau pemilik reservasi
+	if role != "admin" && reservation.UserID != userID {
 		ctx.JSON(http.StatusForbidden, gin.H{"error": "You are not authorized to cancel this reservation"})
 		return
 	}
 
-	// Cancel the reservation
+	// Batalkan reservasi
 	if err := c.ReservationModel.Cancel(uint(uintReservationID)); err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to cancel reservation"})
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to cancel reservation: " + err.Error()})
 		return
 	}
 
 	ctx.JSON(http.StatusOK, gin.H{"message": "Reservation cancelled successfully"})
+}
+
+// UpdateReservationStatus handles updating the status of a reservation (admin-only)
+func (c *ReservationController) UpdateReservationStatus(ctx *gin.Context) {
+	// Ambil ID reservasi dari parameter URL
+	reservationID := ctx.Param("id")
+	uintReservationID, err := strconv.ParseUint(reservationID, 10, 32)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid reservation ID"})
+		return
+	}
+
+	// Ambil status baru dari body permintaan
+	var requestBody struct {
+		Status string `json:"status"`
+	}
+	if err := ctx.ShouldBindJSON(&requestBody); err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input: " + err.Error()})
+		return
+	}
+
+	// Validasi status baru
+	validStatuses := map[string]bool{
+		"pending":   true,
+		"completed": true,
+		"cancelled": true,
+	}
+	if !validStatuses[requestBody.Status] {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid status. Allowed statuses: pending, completed, cancelled"})
+		return
+	}
+
+	// Perbarui status reservasi
+	if err := c.ReservationModel.UpdateStatus(uint(uintReservationID), requestBody.Status); err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update reservation status: " + err.Error()})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, gin.H{"message": "Reservation status updated successfully"})
 }

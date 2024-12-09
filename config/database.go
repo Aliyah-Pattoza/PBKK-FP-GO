@@ -11,7 +11,7 @@ import (
 var DB *gorm.DB
 
 func ConnectDatabase() {
-	db, err := gorm.Open(mysql.Open("root:@tcp(127.0.0.1:3306)/pbkk-fp-go"), &gorm.Config{})
+	db, err := gorm.Open(mysql.Open("root:@tcp(127.0.0.1:3306)/pbkk-fp-go?parseTime=true"), &gorm.Config{})
 	if err != nil {
 		panic(err)
 	}
